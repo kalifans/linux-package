@@ -16,7 +16,7 @@ https://github.com/Mint-Fans/linux-package/blob/IOS/savethemblobs.zip
 
 打開命令提示字元
 cd \savethemblobs
-savethemblobs.py <UniqueChipID> iPhone4,1
+savethemblobs.py <ECID> iPhone4,1
 
 範例: savethemblobs.py 2700125700872 iPhone4,1
 
