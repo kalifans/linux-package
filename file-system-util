@@ -1,0 +1,682 @@
+#!/bin/bash
+
+
+############################################
+format_fun(){
+clear
+echo -e ""
+echo -e "    格式化分割區"
+echo -e ""
+lsblk -f | grep sd
+echo -e ""
+read FORMAT
+[[ "$FORMAT" ]]
+
+if [ "$FORMAT" == "" ]; then
+    format_fun
+fi
+
+echo -e ""
+echo -e "    分割區標籤"
+echo -e ""
+read LABEL
+[[ "$LABEL" ]]
+
+TARGET=/dev/"$FORMAT"
+
+echo -e ""
+echo -e "   你確定要格式化?"
+echo -e ""
+echo -e "   選項 [y/n]"
+echo -e ""
+read OK
+[[ "$OK" ]]
+
+if [ "$OK" == "y" ]; then
+    if [ "$LABEL" == "" ]; then
+        umount "$TARGET"
+        mkfs.ext4 -F $TARGET
+    else
+        umount "$TARGET"
+        mkfs.ext4 -F $TARGET -L $LABEL
+    fi
+else
+    main_fun
+fi
+
+}
+
+############################################
+fstab_fun(){
+clear
+echo -e ""
+echo -e "    選擇修復目標"
+echo -e ""
+lsblk -f | grep sd
+echo -e ""
+read TARGET
+[[ "$TARGET" ]]
+
+if [ "$TARGET" == "" ]; then
+    menu_fun
+else
+    mount $TARGET /mnt
+    sleep 1
+    genfstab -U /mnt > /mnt/etc/fstab
+    sleep 1
+    umount -l /mnt
+
+    zenity --title="檔案系統工具" --info --text="已修復fstab修復"
+fi
+
+}
+
+############################################
+sqfs_restore_fun(){
+
+cd /mnt
+unsquashfs $SAVEPATH
+sleep 1
+mv squashfs-root/* /mnt
+rm -r squashfs-root
+rm -r lost+found
+
+}
+
+############################################
+ext4_restore_fun(){
+# Restore LiveOS to Disk
+mkdir -p /tmp/squashfs
+mkdir -p /tmp/rootfs
+mount -t squashfs $SAVEPATH /tmp/squashfs
+mount -o norecovery /tmp/squashfs/LiveOS/rootfs.img /tmp/rootfs
+sleep 1
+
+SRC=/tmp/rootfs
+DEST=/mnt
+
+cd $SRC; (tar cf - *) | (cd $DEST ; tar xf -) > /dev/null 2>&1
+sleep 1
+
+cd /
+
+umount /tmp/rootfs
+umount /tmp/squashfs
+
+}
+
+############################################
+restore_fun(){
+clear
+echo -e ""
+echo -e "    選擇還原目標"
+echo -e ""
+lsblk -f | grep sd
+echo -e ""
+read TARGET
+[[ "$TARGET" ]]
+
+if [ "$TARGET" == "" ]; then
+    restore_fun
+fi
+
+zenity --file-selection --title="選擇要還原的映像檔" --file-filter=""*.squashfs" "*.img"" --filename=$HOME/ > /tmp/target
+SAVEPATH=$(cat /tmp/target)
+
+CHECK_RSTYPE=$(cat /tmp/target | grep 'squashfs$')
+if [ "$CHECK_RSTYPE" == "" ]; then
+    RSTYPE='liveos'
+else
+    RSTYPE='squashfs'
+fi
+
+echo -e ""
+echo -e "   你確定要還原?"
+echo -e ""
+echo -e "   選項 [y/n]"
+echo -e ""
+read OK
+[[ "$OK" ]]
+
+if [ "$OK" == "y" ]; then
+    umount /dev/$TARGET /mnt
+    mount /dev/$TARGET /mnt
+    sleep 1
+
+    if [ "$RSTYPE" == "squashfs" ]; then
+        sqfs_restore_fun
+    else
+        ext4_restore_fun
+    fi
+
+    # Rebuild fstab
+    /usr/local/bin/genfstab -U /mnt > /mnt/etc/fstab
+    # Settings hostname
+    echo localhosts > /mnt/etc/hostname
+
+    umount -l /mnt
+
+    zenity --title="檔案系統工具" --info --text="已還原目標分割區: $TARGET"
+else
+    main_fun
+fi
+
+}
+
+############################################
+sqfs_backup_fun(){
+rm -rf /mnt/0
+rm -rf /mnt/boot/grub/grub.cfg
+rm -rf /mnt/home/*/*
+rm -rf /mnt/home/*/.*
+rm -rf /mnt/root/*
+rm -rf /mnt/root/.*
+
+rm -rf /mnt/lost+found
+rm -rf /mnt/media/*
+rm -rf /mnt/tmp/*
+rm -rf /mnt/tmp/.*
+
+rm -rf /mnt/etc/fstab
+rm -rf /mnt/etc/NetworkManager/system-connections/*
+rm -rf /mnt/etc/hosts.mintnanny.backup
+rm -rf /mnt/etc/apt/trusted.gpg~
+
+rm /mnt/var/cache/apt/archives/*
+rm -rf /mnt/var/backups/*
+rm /mnt/var/cache/apt/*
+rm /mnt/var/cache/flashplugin-nonfree/*
+rm /mnt/var/cache/debconf/*-old
+rm -rf /mnt/var/cache/fontconfig/*
+
+rm /mnt/var/lib/AccountsService/*/*
+rm /mnt/var/lib/alsa/*
+rm /mnt/var/lib/apt/lists/*
+rm /mnt/var/lib/aptitude/*
+rm /mnt/var/lib/blueman/*
+rm -rf /mnt/var/lib/bluetooth/*
+rm /mnt/var/lib/dpkg/*-old
+rm /mnt/var/lib/dhcp/*
+rm -r /mnt/var/lib/dkms/*
+rm /mnt/var/lib/emacsen-common/state/flavor/installed/*
+rm /mnt/var/lib/insserv/*
+rm /mnt/var/lib/logrotate/*
+rm -rf /mnt/var/lib/mdm/*
+rm -rf /mnt/var/lib/mdm/.*
+rm -rf /mnt/var/lib/mdm/:*
+rm /mnt/var/lib/misc/*
+rm /mnt/var/lib/NetworkManager/*
+rm /mnt/var/lib/ntpdate/*
+rm /mnt/var/lib/openvpn/chroot/tmp/*
+rm /mnt/var/lib/os-prober/*
+rm /mnt/var/lib/plymouth/*
+rm /mnt/var/lib/samba/printers/*/*
+rm /mnt/var/lib/samba/private/*
+rm /mnt/var/lib/samba/usershares/*
+rm /mnt/var/lib/sgml-base/*.old
+rm /mnt/var/lib/snmp/*
+rm /mnt/var/lib/sudo/*/*
+rm /mnt/var/lib/synaptic/*
+rm /mnt/var/lib/systemd/backlight/*
+rm /mnt/var/lib/systemd/rfkill/*
+rm /mnt/var/lib/udisks2/*
+rm /mnt/var/lib/upower/*
+rm -rf /mnt/var/tmp/*
+rm -f /mnt/var/log/*
+rm -rf /mnt/var/log/*/*
+
+echo localhosts > /mnt/etc/hostname
+
+cd /
+mksquashfs mnt $SAVEPATH
+sleep 1
+}
+
+############################################
+ext4_backup_fun(){
+# boot clean
+rm -rf /mnt/boot/grub2/grub.cfg
+rm -rf /mnt/boot/initramfs-0-rescue-*
+rm -rf /mnt/boot/vmlinuz-0-rescue-*
+# etc clean
+rm -rf /mnt/etc/nsswitch.conf.bak
+rm -rf /mnt/etc/group-
+rm -rf /mnt/etc/gshadow-
+rm -rf /mnt/etc/passwd-
+rm -rf /mnt/etc/shadow-
+rm -rf /mnt/etc/subgid-
+rm -rf /mnt/etc/subuid-
+rm -rf /mnt/etc/fstab
+# home clean
+rm -rf /mnt/home/*/*
+rm -rf /mnt/home/*/.*
+rm -rf /mnt/root/*
+rm -rf /mnt/root/.*
+# misc clean
+rm -rf /mnt/media/*
+rm -rf /mnt/tmp/*
+rm -rf /mnt/tmp/.*
+rm -rf /mnt/lost+found
+# var clean
+rm -rf /mnt/var/cache/dnf/*
+rm -rf /mnt/var/cache/zypp/*
+rm -rf /mnt/var/cache/zypper/*
+rm -rf /mnt/var/lib/blueman/*
+rm -rf /mnt/var/lib/bluetooth/*
+rm -rf /mnt/var/lib/dhclient/*
+rm -rf /mnt/var/lib/dhcp/*
+rm -rf /mnt/var/lib/dhcp6/*
+rm -rf /mnt/var/lib/dkms/*
+rm -rf /mnt/var/lib/dnf/yumdb/*
+rm -rf /mnt/var/lib/dnf/history/*
+rm -rf /mnt/var/lib/dnsmasq/*
+rm -rf /mnt/var/lib/logrotate/*
+rm -rf /mnt/var/lib/NetworkManager/*
+rm -rf /mnt/var/lib/rsyslog/*
+rm -rf /mnt/var/lib/smartmontools/*
+rm -rf /mnt/var/lib/systemd/backlight/*
+rm -rf /mnt/var/lib/systemd/catalog/*
+rm -rf /mnt/var/lib/systemd/coredump/*
+rm -rf /mnt/var/lib/systemd/rfkill/*
+rm -rf /mnt/var/lib/upower/*
+rm -f /mnt/var/log/*
+rm -rf /mnt/var/log/*/*
+rm -rf /mnt/var/tmp/*
+
+# Settings hostname
+echo localhosts > /mnt/etc/hostname
+
+# Build LiveOS Image
+mkdir -p $SAVEDIR/squashfs-root/LiveOS
+USED=$(df | grep /dev/$TARGET | awk '{print $3 }')
+BS=$(expr $USED + 2097152)
+dd if=/dev/zero of=$SAVEDIR/squashfs-root/LiveOS/rootfs.img bs=$BS count=1024 status=progress
+sleep 1
+
+mkfs.ext4 -j -L ROOTFS $SAVEDIR/squashfs-root/LiveOS/rootfs.img
+sleep 1
+
+mkdir -p /tmp/rootfs
+mount -o loop $SAVEDIR/squashfs-root/LiveOS/rootfs.img /tmp/rootfs
+sleep 1
+
+SRC=/mnt
+DEST=/tmp/rootfs
+cd $SRC; (tar cf - *) | (cd $DEST ; tar xf -) > /dev/null 2>&1
+
+cd $SAVEDIR
+umount $DEST
+
+mksquashfs squashfs-root squashfs.img
+sleep 1
+
+rm -rf squashfs-root
+
+}
+
+############################################
+backup_fun(){
+clear
+echo -e ""
+echo -e "    選擇備份目標"
+echo -e ""
+lsblk -f | grep sd
+echo -e ""
+read TARGET
+[[ "$TARGET" ]]
+
+if [ "$TARGET" == "" ]; then
+    restore_fun
+fi
+
+echo -e ""
+echo -e "    選擇製作映像檔類型"
+echo -e ""
+echo -e "    1) Debian / Ubuntu Squashfs"
+echo -e ""
+echo -e "    2) Fedora / openSUSE LiveOS"
+echo -e ""
+read MKIMG_TYPE
+[[ "$MKIMG_TYPE" ]]
+
+if [ "$MKIMG_TYPE" == "2" ]; then
+    IMG_TYPE='liveos'
+else
+    IMG_TYPE='squashfs'
+fi
+
+if [ "$IMG_TYPE" == "squashfs" ]; then
+    zenity --file-selection --title="保存檔案系統" --save --filename=filesystem.squashfs > /tmp/target
+else
+    zenity --file-selection --title="保存檔案系統" --save --filename=squashfs.img > /tmp/target
+fi
+
+SAVEPATH=$(cat /tmp/target)
+SAVEDIR=$(dirname $SAVEPATH)
+
+echo -e ""
+echo -e "   你確定要備份?"
+echo -e ""
+echo -e "   選項 [y/n]"
+echo -e ""
+read OK
+[[ "$OK" ]]
+
+if [ "$OK" == "y" ]; then
+    rm -rf $SAVEPATH
+    umount /dev/$TARGET
+    mount /dev/$TARGET /mnt
+    sleep 1
+
+    if [ "$IMG_TYPE" == "squashfs" ]; then
+        sqfs_backup_fun
+    else
+        ext4_backup_fun
+    fi
+
+    # Rebuild fstab
+    /usr/local/bin/genfstab -U /mnt > /mnt/etc/fstab
+
+    umount -l /mnt
+
+    zenity --title="檔案系統工具" --info --text="已備份目標分割區: $TARGET"
+
+else
+    main_fun
+fi
+
+}
+
+############################################
+mount_fun(){
+clear
+echo -e ""
+echo -e "    選擇掛載目標"
+echo -e ""
+lsblk -f | grep sd
+echo -e ""
+read TARGET
+[[ "$TARGET" ]]
+
+if [ "$TARGET" == "" ]; then
+    menu_fun
+fi
+
+echo -e ""
+echo -e "    是否掛載 /boot"
+echo -e ""
+echo -e "   選項 [y/n]"
+echo -e ""
+read MOUNT_BOOT
+[[ "$MOUNT_BOOT" ]]
+
+if [ "$MOUNT_BOOT" == "" ]; then
+    MOUNT_BOOT='n'
+fi
+
+if [ "$MOUNT_BOOT" == "y" ]; then
+    echo -e ""
+    echo -e "    設定/boot目錄掛載點"
+    echo -e "    輸入範例:  sda2"
+    lsblk -f | grep sd
+
+    read BOOT_MP
+    [[ "$BOOT_MP" ]]
+
+    BOOT=/dev/"$BOOT_MP"
+fi
+
+echo -e ""
+echo -e "    是否掛載 /home"
+echo -e ""
+echo -e "   選項 [y/n]"
+echo -e ""
+read MOUNT_HOME
+[[ "$MOUNT_HOME" ]]
+
+if [ "$MOUNT_HOME" == "" ]; then
+    MOUNT_HOME='n'
+fi
+
+if [ "$MOUNT_HOME" == "y" ]; then
+    echo -e ""
+    echo -e "    設定/home目錄掛載點"
+    echo -e "    輸入範例:  sda4"
+    lsblk -f | grep sd
+
+    read HOME_MP
+    [[ "$HOME_MP" ]]
+
+    HOME=/dev/"$HOME_MP"
+fi
+
+umount /dev/$TARGET
+mount /dev/$TARGET /mnt
+
+if [ "$MOUNT_BOOT" == "y" ]; then
+    mount $BOOT /mnt/boot
+fi
+
+if [ "$MOUNT_HOME" == "y" ]; then
+    mount $HOME /mnt/home
+fi
+
+zenity --title="檔案系統工具" --info --text="已掛載分割區: $TARGET"
+
+}
+
+############################################
+mount_sys_fun(){
+mount --bind /dev /mnt/dev
+mount --bind /dev/pts /mnt/dev/pts
+mount --bind /proc /mnt/proc
+mount --bind /sys /mnt/sys
+zenity --title="檔案系統工具" --info --text="已掛載虛擬檔案系統"
+}
+
+############################################
+umount_fun(){
+umount /mnt/dev/pts
+umount /mnt/dev
+umount /mnt/proc
+umount /mnt/sys
+umount /mnt/home
+umount /mnt/boot
+umount -l /mnt
+zenity --title="檔案系統工具" --info --text="已掛載分割區"
+}
+
+############################################
+grub_fun(){
+clear
+echo -e ""
+echo -e "    選擇修復目標"
+echo -e ""
+echo -e "    1) 修復本地選單"
+echo -e ""
+echo -e "    2) 修復掛載目標"
+echo -e ""
+echo -e ""
+read TARGET
+[[ "$TARGET" ]]
+
+if [ "$TARGET" == "1" ]; then
+    if [ -d "/boot/grub2" ]; then
+        grub2-mkconfig -o /boot/grub2/grub.cfg
+    else
+        grub-mkconfig -o /boot/grub/grub.cfg
+    fi
+
+elif [ "$TARGET" == "2" ]; then
+    clear
+    echo -e ""
+    echo -e "    選擇引導種類"
+    echo -e ""
+    echo -e "    1) EFI"
+    echo -e ""
+    echo -e "    2) BIOS"
+    echo -e ""
+    read TYPE
+    [[ "$TYPE" ]]
+
+    echo -e ""
+    echo -e "   確定要修復GRUB?"
+    echo -e ""
+    echo -e "   選項 [y/n]"
+    echo -e ""
+    read OK
+    [[ "$OK" ]]
+
+    if [ "$OK" == "y" ]; then
+        DISK=$(lsblk | grep /mnt$ | sed 's/.*sd/sd/g' | awk '{print $1}' | sed s/[0-9]//g)
+        if [ "$DISK" == "" ]; then
+            echo -e "    請掛載目標分割區"
+            read
+            menu_fun
+        fi
+        mount_sys_fun
+
+        if [ "$TYPE" == "1" ]; then
+            rm -rf /mnt/boot/efi
+            mkdir -p /mnt/boot/efi
+            mount /dev/"$DISK"1 /mnt/boot/efi
+            if [ -d "/mnt/boot/grub2" ]; then
+                $RUN_IN_CHROOT "grub2-install --target=x86_64-efi --force /dev/$DISK"
+            else
+                $RUN_IN_CHROOT "grub-install --target=x86_64-efi --force /dev/$DISK"
+            fi
+            mkdir -p /mnt/boot/efi/EFI/boot
+            cp /mnt/boot/efi/EFI/*/grubx64.efi /mnt/boot/efi/EFI/boot/bootx64.efi
+        else
+            if [ -d "/mnt/boot/grub2" ]; then
+                $RUN_IN_CHROOT "grub2-install --target=i386-pc --force /dev/$DISK"
+            else
+                $RUN_IN_CHROOT "grub-install --target=i386-pc --force /dev/$DISK"
+            fi
+        fi
+        #### Make Grub Menu
+        if [ -d "/mnt/boot/grub2" ]; then
+            $RUN_IN_CHROOT "grub2-mkconfig -o /boot/grub2/grub.cfg"
+        else
+            $RUN_IN_CHROOT "grub-mkconfig -o /boot/grub/grub.cfg"
+        fi
+    fi
+else
+    menu_fun
+fi
+}
+
+############################################
+initrd_chroot_fun(){
+chroot /mnt /bin/bash << 'ENDCHROOT'
+update-initramfs -u -k $(ls /lib/modules/)
+ENDCHROOT
+}
+
+dracut_chroot_fun(){
+chroot /mnt /bin/bash << 'ENDCHROOT'
+dracut --kver $(ls /lib/modules/) --force -v
+ENDCHROOT
+}
+
+initrd_fun(){
+clear
+echo -e ""
+echo -e "    重建 Initramfs 目標"
+echo -e ""
+echo -e "    1) 重建本地 Initramfs"
+echo -e ""
+echo -e "    2) 重建掛載目標 Initramfs"
+echo -e ""
+echo -e ""
+read TARGET
+[[ "$TARGET" ]]
+
+if [ "$TARGET" == "1" ]; then
+    if [ -f "/usr/bin/dracut" ]; then
+        dracut --kver $(uname -r) -f -v
+    else
+        update-initramfs -u
+    fi
+
+elif [ "$TARGET" == "2" ]; then
+    CHECK_MNT=$(lsblk | grep /mnt)
+    if [ "$CHECK_MNT" == "" ]; then
+        echo -e "    請掛載目標分割區"
+        read
+        menu_fun
+    fi
+    mount_sys_fun
+    if [ -f "/mnt/usr/bin/dracut" ]; then
+        dracut_chroot_fun
+    else
+        initrd_chroot_fun
+    fi
+fi
+
+}
+
+
+############################################
+menu_fun(){
+clear
+echo -e ""
+echo -e "    檔案系統工具"
+echo -e ""
+echo -e "    1) 格式化分割區"
+echo -e ""
+echo -e "    2) 重建fstab"
+echo -e ""
+echo -e "    3) 還原檔案系統"
+echo -e ""
+echo -e "    4) 備份檔案系統"
+echo -e ""
+echo -e "    5) 掛載分割區"
+echo -e ""
+echo -e "    6) 掛載虛擬檔案系統"
+echo -e ""
+echo -e "    7) 卸載分割區"
+echo -e ""
+echo -e "    8) 重建GRUB選單"
+echo -e ""
+echo -e "    9) 更新Initramfs"
+echo -e ""
+echo -e "    0) 退出"
+
+read MENU
+[[ "$MENU" ]]
+
+if [ "$MENU" == "1" ]; then
+    format_fun
+    menu_fun
+elif [ "$MENU" == "2" ]; then
+    fstab_fun
+    menu_fun
+elif [ "$MENU" == "3" ]; then
+    restore_fun
+    menu_fun
+elif [ "$MENU" == "4" ]; then
+    backup_fun
+    menu_fun
+elif [ "$MENU" == "5" ]; then
+    mount_fun
+    menu_fun
+elif [ "$MENU" == "6" ]; then
+    mount_sys_fun
+    menu_fun
+elif [ "$MENU" == "7" ]; then
+    umount_fun
+    menu_fun
+elif [ "$MENU" == "8" ]; then
+    grub_fun
+    menu_fun
+elif [ "$MENU" == "9" ]; then
+    initrd_fun
+    menu_fun
+else
+    exit
+fi
+
+}
+
+menu_fun
