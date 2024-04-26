@@ -1,0 +1,336 @@
+#############################################################
+# Install Build Tools
+#############################################################
+# 安裝編譯工具
+sudo apt-get install gcc g++ autoconf autogen automake autotools-dev m4 pkg-config intltool libtool make cmake
+
+# 安裝 GCC 5 (選項)
+# 如果要使用GCC5版本編譯再安裝
+sudo sh -c "echo deb [trusted=yes] http://snapshot.debian.org/archive/debian/20161101T033116Z/ sid main >> /etc/apt/sources.list.d/snapshot-debian-package-repositories.list"
+sudo apt-get update
+sudo apt-get install gcc-5 g++-5
+# sudo ln -sf gcc /usr/bin/cc
+sudo rm -rf /etc/apt/sources.list.d/snapshot-debian-package-repositories.list
+
+# Switch GCC 5
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-5 40
+sudo update-alternatives --config gcc
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-5 40
+sudo update-alternatives --config g++
+
+#############################################################
+# Build googletest
+#############################################################
+# 安裝依賴
+sudo apt-get install cmake python
+
+# 下載原始碼
+wget -O googletest-release-1.8.0.tar.gz https://src.fedoraproject.org/repo/pkgs/gtest/release-1.8.0.tar.gz/sha512/1dbece324473e53a83a60601b02c92c089f5d314761351974e097b2cf4d24af4296f9eb8653b6b03b1e363d9c5f793897acae1f0c7ac40149216035c4d395d9d/release-1.8.0.tar.gz
+tar -xzvf googletest-release-1.8.0.tar.gz
+
+# 編譯套件
+cd googletest-release-1.8.0
+PKGDIR=$HOME/Build/googletest
+cmake -DCMAKE_INSTALL_PREFIX=/usr/local CMakeLists.txt
+make -j$(nproc)
+make install DESTDIR=$PKGDIR
+cmake -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr/local CMakeLists.txt
+make -j$(nproc)
+make install DESTDIR=$PKGDIR
+
+install -D -m755 googlemock/scripts/generator/gmock_gen.py $PKGDIR/usr/local/bin/gmock_gen.py
+install -D -m644 googlemock/scripts/generator/cpp/ast.py $PKGDIR/usr/local/share/googletest-tools/generator/cpp/ast.py
+install -D -m644 googlemock/scripts/generator/cpp/gmock_class_test.py $PKGDIR/usr/local/share/googletest-tools/generator/cpp/gmock_class_test.py
+install -D -m644 googlemock/scripts/generator/cpp/keywords.py $PKGDIR/usr/local/share/googletest-tools/generator/cpp/keywords.py
+install -D -m644 googlemock/scripts/generator/cpp/utils.py $PKGDIR/usr/local/share/googletest-tools/generator/cpp/utils.py
+install -D -m644 googlemock/scripts/generator/cpp/gmock_class.py $PKGDIR/usr/local/share/googletest-tools/generator/cpp/gmock_class.py
+install -D -m644 googlemock/scripts/generator/cpp/__init__.py $PKGDIR/usr/local/share/googletest-tools/generator/cpp/__init__.py
+install -D -m644 googlemock/scripts/generator/cpp/tokenize.py $PKGDIR/usr/local/share/googletest-tools/generator/cpp/tokenize.py
+
+# 製作套件
+PKGVER=1.8.0
+PKGSIZE=$(du -s $PKGDIR | awk '{print $1}')
+mkdir -p $PKGDIR/DEBIAN
+
+cat > $PKGDIR/DEBIAN/control << EOF
+Package: googletest
+Version: ${PKGVER}-1
+Architecture: amd64
+Maintainer: Debian Core Developers <debian-devel-discuss@lists.debian.org>
+Installed-Size: $PKGSIZE
+Section: libdevel
+Priority: optional
+Multi-Arch: same
+Homepage: https://github.com/google/googletest
+Description: Google's C++ test framework sources
+ This package provides sources for Google Test and Google Mock.
+ .
+ Google Test is a framework for writing C++ tests on a variety of
+ platforms. Based on the xUnit architecture. Supports automatic test
+ discovery, a rich set of assertions, user-defined assertions, death
+ tests, fatal and non-fatal failures, value- and type-parameterized
+ tests, various options for running the tests, and XML test report
+ generation.
+ .
+ Google Mock is an extension of Google Test for C++ mocking.  Inspired
+ by jMock, EasyMock, and Hamcrest, and designed with C++'s specifics
+ in mind, it can help you derive better designs of your system and
+ write better tests.
+ .
+ Google Mock:
+ .
+  - provides a declarative syntax for defining mocks,
+  - can easily define partial (hybrid) mocks, which are a cross of real
+    and mock objects,
+  - handles functions of arbitrary types and overloaded functions,
+  - comes with a rich set of matchers for validating function arguments,
+  - uses an intuitive syntax for controlling the behavior of a mock,
+  - does automatic verification of expectations (no record-and-replay
+    needed),
+  - allows arbitrary (partial) ordering constraints on
+    function calls to be expressed,
+  - lets a user extend it by defining new matchers and actions.
+  - does not use exceptions, and
+  - is easy to learn and use.
+ .
+ NOTE: This package does not contain a library to link against, but rather
+ the source code to build the google test and mock libraries.  This enables
+ building the google test and mock libraries with the same flags as the
+ C++ code under test.
+EOF
+
+sudo chown -R 0:0 $PKGDIR
+sudo dpkg -b $PKGDIR $HOME/Build/googletest_${PKGVER}-1_amd64.deb
+
+# 安裝套件
+sudo dpkg -i $HOME/Build/googletest_${PKGVER}-1_amd64.deb
+
+cd ..
+
+#############################################################
+# Build protobuf
+#############################################################
+# 安裝依賴
+sudo apt-get install zlib1g-dev
+
+# 下載原始碼
+wget https://github.com/google/protobuf/releases/download/v2.6.1/protobuf-2.6.1.tar.gz
+tar -zvxf protobuf-2.6.1.tar.gz
+
+# 編譯套件
+cd protobuf-2.6.1
+./configure --prefix=/usr/local
+make -j$(nproc)
+make check
+PKGDIR=$HOME/Build/protobuf
+make install DESTDIR=$PKGDIR
+
+# 製作套件
+PKGVER=2.6.1
+PKGSIZE=$(du -s $PKGDIR | awk '{print $1}')
+mkdir -p $PKGDIR/DEBIAN
+
+cat > $PKGDIR/DEBIAN/control << EOF
+Package: protobuf
+Version: ${PKGVER}-1
+Depends: libc6, libgcc1, libstdc++6, zlib1g
+Architecture: amd64
+Maintainer: Debian Core Developers <debian-devel-discuss@lists.debian.org>
+Installed-Size: $PKGSIZE
+Section: libdevel
+Priority: optional
+Multi-Arch: same
+Homepage: https://github.com/google/protobuf/
+Description: protocol buffers C++ library (development files) and proto files
+ Protocol buffers are a flexible, efficient, automated mechanism for
+ serializing structured data - similar to XML, but smaller, faster, and
+ simpler. You define how you want your data to be structured once, then you can
+ use special generated source code to easily write and read your structured
+ data to and from a variety of data streams and using a variety of languages.
+ You can even update your data structure without breaking deployed programs
+ that are compiled against the "old" format.
+ .
+ Google uses Protocol Buffers for almost all of its internal RPC protocols and
+ file formats.
+ .
+ This package contains the development headers and static libraries needed for
+ writing C++ applications. Includes well known proto type files.
+EOF
+
+sudo chown -R 0:0 $PKGDIR
+sudo dpkg -b $PKGDIR $HOME/Build/protobuf_${PKGVER}-1_amd64.deb
+
+# 安裝套件
+sudo dpkg -i $PKGDIR $HOME/Build/protobuf_${PKGVER}-1_amd64.deb
+
+cd ..
+
+#############################################################
+# Build jemalloc
+#############################################################
+# 安裝依賴
+sudo apt-get install xsltproc
+
+# 下載原始碼
+wget https://src.fedoraproject.org/repo/pkgs/jemalloc/jemalloc-3.4.0.tar.bz2/c4fa3da0096d5280924a5f7ebc8dbb1c/jemalloc-3.4.0.tar.bz2
+tar -jvxf jemalloc-3.4.0.tar.bz2
+
+# 編譯套件
+cd jemalloc-3.4.0
+./configure
+make -j$(nproc)
+PKGDIR=$HOME/Build/jemalloc
+make install DESTDIR=$PKGDIR
+
+# 製作套件
+PKGVER=3.4.0
+PKGSIZE=$(du -s $PKGDIR | awk '{print $1}')
+mkdir -p $PKGDIR/DEBIAN
+
+cat > $PKGDIR/DEBIAN/control << EOF
+Package: jemalloc
+Version: ${PKGVER}-1
+Depends: libgcc1, libstdc++6
+Architecture: amd64
+Maintainer: Debian Core Developers <debian-devel-discuss@lists.debian.org>
+Installed-Size: $PKGSIZE
+Section: libdevel
+Priority: optional
+Homepage: http://jemalloc.net/
+Description: development files and documentation for jemalloc
+ Files used for development with jemalloc. This package contains
+ headers and documentation.
+ .
+ jemalloc is a library providing a malloc(3) implementation for
+ multi-threaded processes on multi-processor systems.
+EOF
+
+sudo chown -R 0:0 $PKGDIR
+sudo dpkg -b $PKGDIR $HOME/Build/jemalloc_${PKGVER}-1_amd64.deb
+
+# 安裝套件
+sudo dpkg -i $HOME/Build/jemalloc_${PKGVER}-1_amd64.deb
+
+cd ..
+
+#############################################################
+# Build hiredis
+#############################################################
+# 安裝依賴
+sudo apt-get install procps
+
+# 下載原始碼
+wget -O hiredis-0.14.0.tar.gz https://github.com/redis/hiredis/archive/v0.14.0.tar.gz
+tar -xzvf hiredis-0.14.0.tar.gz
+
+# 編譯套件
+cd hiredis-0.14.0
+make -j$(nproc)
+PKGDIR=$HOME/Build/hiredis
+make install DESTDIR=$PKGDIR
+
+# 製作套件
+PKGVER=0.14.0
+PKGSIZE=$(du -s $PKGDIR | awk '{print $1}')
+mkdir -p $PKGDIR/DEBIAN
+
+cat > $PKGDIR/DEBIAN/control << EOF
+Package: hiredis
+Version: ${PKGVER}-1
+Depends: libc6
+Architecture: amd64
+Maintainer: Debian Core Developers <debian-devel-discuss@lists.debian.org>
+Installed-Size: $PKGSIZE
+Section: libdevel
+Priority: optional
+Multi-Arch: same
+Homepage: https://github.com/redis/hiredis
+Description: minimalistic C client library for Redis (development files)
+ Hiredis is a minimalistic C client library for the Redis database. It is
+ minimalistic because it just adds minimal support for the protocol, but
+ at the same time it uses an high level printf-alike API in order to make
+ it much higher level than otherwise suggested by its minimal code base
+ and the lack of explicit bindings for every Redis command.
+ .
+ Apart from supporting sending commands and receiving replies, it comes
+ with a reply parser that is decoupled from the I/O layer. It is a stream
+ parser designed for easy reusability, which can for instance be used in
+ higher level language bindings for efficient reply parsing.
+ .
+ Hiredis only supports the binary-safe Redis protocol, so you can use it
+ with any Redis version >= 1.2.0.
+ .
+ The library comes with multiple APIs. There is the synchronous API, the
+ asynchronous API and the reply parsing API.
+ .
+ This package provides the development files for hiredis.
+EOF
+
+sudo chown -R 0:0 $PKGDIR
+sudo dpkg -b $PKGDIR $HOME/Build/hiredis_${PKGVER}-1_amd64.deb
+
+# 安裝套件
+sudo dpkg -i $HOME/Build/hiredis_${PKGVER}-1_amd64.deb
+
+cd ..
+
+#############################################################
+# Build redis
+#############################################################
+# 安裝依賴
+sudo apt-get install liblua5.1-dev lua-bitop-dev lua-cjson-dev procps tcl
+
+# 下載原始碼
+wget http://download.redis.io/releases/redis-4.0.6.tar.gz
+tar -zxvf redis-4.0.6.tar.gz
+
+# 編譯套件
+cd redis-4.0.6
+sed -i 's/daemonize no/daemonize yes/g' redis.conf
+make MALLOC=libc
+# make install
+PKGDIR=$HOME/Build/redis
+install -D -m755 src/redis-benchmark $PKGDIR/usr/local/bin/redis-benchmark
+install -D -m755 src/redis-check-aof $PKGDIR/usr/local/bin/redis-check-aof
+install -D -m755 src/redis-check-rdb $PKGDIR/usr/local/bin/redis-check-rdb
+install -D -m755 src/redis-cli $PKGDIR/usr/local/bin/redis-cli
+install -D -m755 src/redis-server $PKGDIR/usr/local/bin/redis-server
+ln -sf redis-server $PKGDIR/usr/local/bin/redis-sentinel
+install -D -m644 redis.conf $PKGDIR/etc/redis/6379.conf
+#install -D -m644 sentinel.conf $PKGDIR/etc/redis/sentinel.conf
+install -D -m755 utils/redis_init_script $PKGDIR/etc/init.d/redisd
+
+# 製作套件
+PKGVER=4.0.6
+PKGSIZE=$(du -s $PKGDIR | awk '{print $1}')
+mkdir -p $PKGDIR/DEBIAN
+
+cat > $PKGDIR/DEBIAN/control << EOF
+Package: redis
+Version: ${PKGVER}-1
+Depends: lsb-base, adduser, libatomic1, libc6, liblua5.1-0, lua-bitop, lua-cjson
+Architecture: amd64
+Maintainer: Debian Core Developers <debian-devel-discuss@lists.debian.org>
+Installed-Size: $PKGSIZE
+Section: database
+Priority: optional
+Homepage: https://redis.io/
+Description: Persistent key-value database with network interface (metapackage)
+ Redis is a key-value database in a similar vein to memcache but the dataset
+ is non-volatile. Redis additionally provides native support for atomically
+ manipulating and querying data structures such as lists and sets.
+ .
+ The dataset is stored entirely in memory and periodically flushed to disk.
+ .
+ This package depends on the redis-server package.
+EOF
+
+sudo chown -R 0:0 $PKGDIR
+sudo dpkg -b $PKGDIR $HOME/Build/redis_${PKGVER}-1_amd64.deb
+
+# 安裝套件
+sudo dpkg -i $HOME/Build/redis_${PKGVER}-1_amd64.deb
+
+啟動服務: sudo /etc/init.d/redisd start
+停止服務: sudo /etc/init.d/redisd stop
+
