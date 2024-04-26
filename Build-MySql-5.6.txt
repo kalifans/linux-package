@@ -161,7 +161,8 @@ EOF
 PKGVER=5.6.49
 PKGSIZE=$(du -s $PKGDIR | awk '{print $1}')
 
-DEPENDS="bsdutils, debconf, debianutils, init-system-helpers, libc6, libgcc-s1 | libgcc1, libstdc++6, lsb-base, passwd, perl, psmisc, libaio1, libedit2, zlib1g, libjemalloc1 | libjemalloc2"
+DEPENDS="bsdutils, debconf, debianutils, init-system-helpers, libc6, libgcc-s1 | libgcc1, libstdc++6, lsb-base, passwd, perl, psmisc, libaio1, libedit2, zlib1g
+# DEPENDS+=", libjemalloc1 | libjemalloc2"
 # add -DWITH_LIBWRAP=ON
 DEPENDS+=", libwrap0"
 
