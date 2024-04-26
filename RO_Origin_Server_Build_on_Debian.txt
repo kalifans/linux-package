@@ -1,0 +1,107 @@
+#############################################################
+# RO Origin Server Build on Debian 10
+#############################################################
+# 安裝依賴
+sudo apt-get install git gzip bzip2 libc6-i386 
+sudo apt-get install libc6-dev zlib1g-dev liblzma-dev
+sudo apt-get install libjansson-dev libicu-dev libxml2-dev libapr1-dev libaprutil1-dev libboost-dev
+#libjemalloc-dev libhiredis-dev redis
+
+# 安裝編譯工具
+sudo apt-get install gcc g++ autoconf autogen automake autotools-dev m4 pkg-config intltool libtool make cmake
+
+wget https://github.com/kalifans/linux-package/raw/Build/Premake.zip
+unzip Premake.zip
+cd Premake
+sudo ./inst
+cd ..
+
+##############################################################
+# 安裝 GCC 5 (推薦選項)
+# 如果要使用GCC5版本編譯再安裝
+sudo sh -c "echo deb [trusted=yes] http://snapshot.debian.org/archive/debian/20161101T033116Z/ sid main >> /etc/apt/sources.list.d/snapshot-debian-package-repositories.list"
+sudo apt-get update
+sudo apt-get install gcc-5 g++-5
+# sudo ln -sf gcc /usr/bin/cc
+sudo rm -rf /etc/apt/sources.list.d/snapshot-debian-package-repositories.list
+
+# Switch GCC 5
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-5 40
+sudo update-alternatives --config gcc
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-5 40
+sudo update-alternatives --config g++
+##############################################################
+
+# 清除舊依賴
+sudo apt-get remove --purge libprotobuf-dev libprotoc-dev libgmock-dev libgtest-dev liblog4cxx-dev
+sudo apt-get autoremove
+sudo apt-get autoclean
+sudo apt-get clean all
+
+#############################################################
+# 安裝 Server 編譯依賴
+#############################################################
+# 套件編譯方法可參考: https://raw.githubusercontent.com/kalifans/linux-package/ROO/Debian-Build-Depends.txt
+
+wget https://github.com/kalifans/linux-package/raw/ROO/googletest_1.8.0-1_amd64.deb
+dpkg -i googletest_1.8.0-1_amd64.deb
+
+wget https://github.com/kalifans/linux-package/raw/ROO/protobuf_2.6.1-1_amd64.deb
+dpkg -i protobuf_2.6.1-1_amd64.deb
+
+wget https://github.com/kalifans/linux-package/raw/ROO/jemalloc_3.4.0-1_amd64.deb
+dpkg -i jemalloc_3.4.0-1_amd64.deb
+
+wget https://github.com/kalifans/linux-package/raw/ROO/log4cxx_0.10.0-16_amd64.deb
+dpkg -i log4cxx_0.10.0-16_amd64.deb
+
+wget https://github.com/kalifans/linux-package/raw/ROO/hiredis_0.14.0-1_amd64.deb
+dpkg -i hiredis_0.14.0-1_amd64.deb
+
+wget https://github.com/kalifans/linux-package/raw/ROO/redis_4.0.6-1_amd64.deb
+dpkg -i redis_4.0.6-1_amd64.deb
+
+然後編譯並安裝 mysql 5.6
+參考: https://github.com/kalifans/linux-package/blob/ROO/Build-MySql-5.6.txt
+其中 libjemalloc-dev 套件不要安裝, 因為已經安裝 jemalloc_3.4.0.
+
+依賴套件都安裝完成後, 重新載入 Lib
+sudo /sbin/ldconfig
+
+#############################################################
+# Build ROO Server
+#############################################################
+tar zxvf roo_server_src.tar.gz
+cd roo_server_src
+
+# EXT Lib
+# export INCLUDES+=" -I${HOME}/Build/log4cxx/usr/include "
+# export LDFLAGS+=" -L${HOME}/Build/log4cxx/usr/lib "
+
+export LANG=C.UTF-8
+export LC_ALL=POSIX
+
+# libso
+rm -rf libso/*
+install -D -m644 /usr/lib/x86_64-linux-gnu/libmysqlclient.so.18 libso/libmysqlclient.so.18
+install -D -m644 /usr/lib/x86_64-linux-gnu/libapr-1.so.0 libso/libapr-1.so.0
+install -D -m644 /usr/lib/x86_64-linux-gnu/libaprutil-1.so.0 libso/libaprutil-1.so.0
+install -D -m644 /usr/lib/x86_64-linux-gnu/libjansson.so.4 libso/libjansson.so.4
+install -D -m644 /usr/lib/x86_64-linux-gnu/liblog4cxx.so.10 libso/liblog4cxx.so.10
+install -D -m644 /usr/local/lib/libprotobuf.so.9 libso/libprotobuf.so.9
+install -D -m644 /usr/local/lib/libjemalloc.so.1 libso/libjemalloc.so.1
+install -D -m644 /usr/local/lib/libhiredis.so.0.14 libso/libhiredis.so.0.14
+
+#########################################
+# 建立Make文件
+# make -j$(nproc) premake4
+# 單一項目編譯
+# cd build
+# make -j$(nproc) config=release testbase
+# 編譯 Debug 版本
+# make -j$(nproc) tf
+#########################################
+
+# 編譯 Release 版本
+make tarball -j$(nproc)
+
