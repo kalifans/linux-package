@@ -1,0 +1,173 @@
+##################################
+###### Build GCC 9.2.0
+##################################
+# Install Build Depends
+
+# Debian
+sudo apt-get install gcc g++ gawk m4 gcc-multilib binutils lzip patch texinfo flex
+
+# CentOS
+sudo yum install wget bzip2 gcc gcc-c++ glibc-headers gcc-gnat
+
+wget https://gcc.gnu.org/pub/gcc/infrastructure/gmp-6.1.0.tar.bz2
+wget https://gcc.gnu.org/pub/gcc/infrastructure/mpfr-3.1.4.tar.bz2
+wget https://gcc.gnu.org/pub/gcc/infrastructure/mpc-1.0.3.tar.gz
+wget https://gcc.gnu.org/pub/gcc/infrastructure/isl-0.18.tar.bz2
+wget https://ftp.gnu.org/gnu/binutils/binutils-2.32.tar.gz
+wget https://ftp.gnu.org/gnu/gcc/gcc-9.2.0/gcc-9.2.0.tar.gz
+
+tar jxvf gmp-6.1.0.tar.bz2
+tar jxvf mpfr-3.1.4.tar.bz2
+tar zxvf mpc-1.0.3.tar.gz
+tar jxvf isl-0.18.tar.bz2
+tar zxvf binutils-2.32.tar.gz
+tar zxvf gcc-9.2.0.tar.gz
+
+GCCROOT=/usr/local/gcc-9.2.0
+
+export CFLAGS+=" -I${GCCROOT}/include"
+export LDFLAGS+=" -L${GCCROOT}/lib -L${GCCROOT}/lib64 -L${GCCROOT}/lib"
+# Debian
+export LDFLAGS+=" -L/usr/lib/x86_64-linux-gnu"
+
+# Debian
+BUILD_HOST=x86_64-linux-gnu
+
+# CentOS
+BUILD_HOST=x86_64-redhat-linux
+
+##################################
+###### gmp
+##################################
+cd gmp-6.1.0
+./configure --prefix=${GCCROOT} --libdir=${GCCROOT}/lib64 --build=${BUILD_HOST}
+
+make -j$(nproc)
+sudo make install
+
+##################################
+###### mpfr
+##################################
+cd ../mpfr-3.1.4
+./configure --prefix=${GCCROOT} --libdir=${GCCROOT}/lib64 --with-gmp=${GCCROOT} --build=${BUILD_HOST}
+
+make -j$(nproc)
+sudo make install
+
+##################################
+###### mpc
+##################################
+cd ../mpc-1.0.3
+./configure --prefix=${GCCROOT} --libdir=${GCCROOT}/lib64 --with-gmp=${GCCROOT} --with-mpfr=${GCCROOT} --build=${BUILD_HOST}
+
+make -j$(nproc)
+sudo make install
+
+##################################
+###### isl
+##################################
+cd ../isl-0.18
+./configure --prefix=${GCCROOT} --libdir=${GCCROOT}/lib64 --with-gmp=${GCCROOT} --build=${BUILD_HOST}
+
+make -j$(nproc)
+sudo make install
+
+##################################
+###### binutils
+##################################
+cd ../binutils-2.32
+
+./configure \
+--build=${BUILD_HOST} \
+--host=${BUILD_HOST} \
+--enable-shared \
+--enable-plugins \
+--enable-threads \
+--with-system-zlib \
+--prefix=${GCCROOT} \
+--libdir=${GCCROOT}/lib64 \
+--enable-deterministic-archives \
+--disable-compressed-debug-sections \
+--enable-new-dtags
+
+make -j$(nproc)
+
+sudo make install
+
+
+##################################
+###### GCC
+##################################
+cd ../gcc-9.2.0
+
+GCCROOT=/usr/local/gcc-9.2.0
+
+mkdir build
+cd build
+
+# Debian
+../configure \
+--prefix=${GCCROOT} \
+--with-gmp=${GCCROOT} \
+--with-mpc=${GCCROOT} \
+--with-mpfr=${GCCROOT} \
+--with-isl=${GCCROOT} \
+--build=${BUILD_HOST} --host=${BUILD_HOST} --target=${BUILD_HOST} \
+--enable-bootstrap \
+--enable-languages=c,c++,objc,obj-c++,fortran,ada,go,lto \
+--enable-shared \
+--enable-threads=posix \
+--enable-__cxa_atexit \
+--enable-gnu-unique-object \
+--enable-linker-build-id \
+--enable-plugin \
+--enable-libmpx \
+--enable-clocale=gnu \
+--enable-lto \
+--enable-version-specific-runtime-libs \
+--enable-gnu-indirect-function \
+--enable-initfini-array \
+--enable-checking=release \
+--with-system-zlib \
+--with-linker-hash-style=gnu \
+--with-tune=generic \
+--with-arch-32=i686 --with-abi=m64 --with-multilib-list=m32,m64,mx32 --enable-multilib \
+--disable-libunwind-exceptions \
+--disable-libgcj
+
+# CentOS
+../configure \
+--prefix=${GCCROOT} \
+--with-gmp=${GCCROOT} \
+--with-mpc=${GCCROOT} \
+--with-mpfr=${GCCROOT} \
+--with-isl=${GCCROOT} \
+--build=${BUILD_HOST} --host=${BUILD_HOST} --target=${BUILD_HOST} \
+--enable-bootstrap \
+--enable-languages=c,c++,objc,obj-c++,fortran,ada,go,lto \
+--enable-shared \
+--enable-threads=posix \
+--enable-__cxa_atexit \
+--enable-gnu-unique-object \
+--enable-linker-build-id \
+--enable-plugin \
+--enable-libmpx \
+--enable-clocale=gnu \
+--enable-lto \
+--enable-version-specific-runtime-libs \
+--enable-gnu-indirect-function \
+--enable-initfini-array \
+--enable-checking=release \
+--enable-multilib \
+--with-system-zlib \
+--with-linker-hash-style=gnu \
+--with-gcc-major-version-only \
+--with-default-libstdcxx-abi=gcc4-compatible \
+--with-tune=generic \
+--with-arch_32=x86-64 \
+--disable-libunwind-exceptions \
+--disable-werror \
+
+make -j$(nproc)
+
+sudo make install

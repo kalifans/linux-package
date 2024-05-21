@@ -1,45 +1,26 @@
 ####################################################
 ### Build MySql 5.6 on Debian
 ####################################################
-# 安裝編譯工具
+# Install Build Tools
 sudo apt-get install gcc g++ autoconf autogen automake autotools-dev m4 pkg-config intltool libtool make cmake
 
-# 安裝 GCC 5 (選項)
-# 如果要使用GCC5版本編譯再安裝
-sudo sh -c "echo deb [trusted=yes] http://snapshot.debian.org/archive/debian/20161101T033116Z/ sid main >> /etc/apt/sources.list.d/snapshot-debian-package-repositories.list"
-sudo apt-get update
-sudo apt-get install gcc-5 g++-5
-# sudo ln -sf gcc /usr/bin/cc
-sudo rm -rf /etc/apt/sources.list.d/snapshot-debian-package-repositories.list
-
-# 切換 GCC 5
-sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-5 40
-sudo update-alternatives --config gcc
-sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-5 40
-sudo update-alternatives --config g++
-
-# 安裝依賴
+# Install Build Dependencies
 sudo apt-get install cmake bison chrpath gawk lsb-release perl pkg-config po-debconf psmisc
-sudo apt-get install libssl-dev libaio-dev libedit-dev libncurses5-dev zlib1g-dev
+sudo apt-get install libssl-dev libaio-dev libedit-dev libncurses5-dev zlib1g-dev libjemalloc-dev
 
-# Debian 10 套件庫為版本2 如果已安裝舊版,則先不要安裝.
-# sudo apt-get install libjemalloc-dev
-
-# 選項 -DWITH_LIBWRAP=ON
+# OPT: -DWITH_LIBWRAP=ON
 # sudo apt-get install libwrap0-dev
 
-# 下載原始碼
-wget https://dev.mysql.com/get/Downloads/MySQL-5.6/mysql-5.6.49.tar.gz
-tar zxvf mysql-5.6.49.tar.gz
+# Download
+wget https://dev.mysql.com/get/Downloads/MySQL-5.6/mysql-5.6.51.tar.gz
+tar zxvf mysql-5.6.51.tar.gz
 
-# 編譯套件
-cd mysql-5.6.49
+# Build
+cd mysql-5.6.51
 
 rm -rf build
 mkdir build
 cd build
-
-SQLVER=5.6
 
 cmake .. \
 -DCMAKE_INSTALL_PREFIX=/usr \
@@ -79,238 +60,5 @@ ${OPT}
 
 make -j$(nproc)
 
-PKGNAME=mysql
-PKGDIR=$HOME/Build/$PKGNAME
-make DESTDIR=$PKGDIR install
-
-cat > $PKGDIR/usr/share/mysql/my-default.cnf << EOF
-[mysqld]
-port = 3306
-user = mysql
-datadir=/var/lib/mysql
-tmpdir=/tmp
-socket=/var/run/mysqld/mysqld.sock
-pid-file=/var/run/mysqld/mysqld.pid
-log_error=/var/log/mysqld/error.log
-EOF
-
-mkdir -p $PKGDIR/lib/systemd/system
-cat > $PKGDIR/lib/systemd/system/mysql.service << EOF
-[mysqld]
-[Unit]
-Description=MySQL Community Server
-After=network.target
-
-[Install]
-WantedBy=multi-user.target
-
-[Service]
-User=mysql
-Group=mysql
-PermissionsStartOnly=true
-ExecStartPre=/usr/share/mysql/mysql-systemd-start pre
-ExecStart=/usr/bin/mysqld_safe
-ExecStartPost=/usr/share/mysql/mysql-systemd-start post
-TimeoutSec=600
-LimitNOFILE = 5000
-Restart=on-failure
-EOF
-
-install -D -m644 ../packaging/deb-in/extra/mysql-helpers $PKGDIR/usr/share/mysql/mysql-helpers
-install -D -m755 ../packaging/deb-in/extra/mysql-systemd-start $PKGDIR/usr/share/mysql/mysql-systemd-start
-sed -i /@DEB_INIT_APPARMOR@/d $PKGDIR/usr/share/mysql/mysql-systemd-start
-install -D -m755 ../packaging/deb-in/mysql-packagesource-server.mysql.init.in $PKGDIR/etc/init.d/mysql
-sed -i /@DEB_INIT_APPARMOR@/d $PKGDIR/etc/init.d/mysql
-sed -i 's/@DEB_PRODUCTNAMEC@/Community/g' $PKGDIR/etc/init.d/mysql
-
-install -D -m644 $PKGDIR/usr/share/mysql/my-default.cnf $PKGDIR/etc/mysql/my.cnf
-install -D -m755 $PKGDIR/usr/share/mysql/mysql.server $PKGDIR/usr/bin/mysql-server
-
-rm -rf $PKGDIR/usr/data
-rm -rf $PKGDIR/usr/mysql-test
-rm -rf $PKGDIR/usr/sql-bench
-
-# strip binrary for gcc-7+
-LIST=$(ls $PKGDIR/usr/bin/)
-for sp in $LIST; do
-    strip --strip-debug $PKGDIR/usr/bin/"$sp"
-    # ln -sf ../mysql/${SQLVER}/bin/"$sp" $PKGDIR/usr/bin/"$sp"
-done
-strip --strip-debug $PKGDIR/usr/sbin/mysqld
-strip --strip-debug $PKGDIR/usr/bin/mysqld
-strip --strip-debug $PKGDIR/usr/lib/x86_64-linux-gnu/*.a
-
-mkdir -p $PKGDIR/usr/lib/pkgconfig
-cat > $PKGDIR/usr/lib/pkgconfig/mysqlclient.pc << EOF
-prefix=/usr
-includedir=\${prefix}/include
-libdir=\${prefix}/lib/x86_64-linux-gnu
-
-Name: mysqlclient
-Description: MySQL client library
-Version: $SQLVER
-Cflags: -I\${includedir} 
-Libs: -L\${libdir} -lmysqlclient
-Libs.private: -lz -lzstd -lresolv -lm
-Requires.private: openssl
-EOF
-
-#####################################
-### 製作套件
-#####################################
-PKGVER=5.6.49
-PKGSIZE=$(du -s $PKGDIR | awk '{print $1}')
-
-DEPENDS="bsdutils, debconf, debianutils, init-system-helpers, libc6, libgcc-s1 | libgcc1, libstdc++6, lsb-base, passwd, perl, psmisc, libaio1, libedit2, zlib1g
-# DEPENDS+=", libjemalloc1 | libjemalloc2"
-# add -DWITH_LIBWRAP=ON
-DEPENDS+=", libwrap0"
-
-mkdir -p $PKGDIR/DEBIAN
-
-# control:
-cat > $PKGDIR/DEBIAN/control << EOF
-Package: ${PKGNAME}-${SQLVER}
-Source: ${PKGNAME}-${SQLVER}
-Version: ${PKGVER}-1
-Architecture: amd64
-Maintainer: Debian MySQL Maintainers <pkg-mysql-maint@lists.alioth.debian.org>
-Installed-Size: $PKGSIZE
-Depends: $DEPENDS
-Section: database
-Priority: optional
-Homepage: http://dev.mysql.com/
-Description: MySQL database server binaries and system database setup
- MySQL is a fast, stable and true multi-user, multi-threaded SQL database
- server. SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MySQL are speed, robustness and
- ease of use.
- .
- This package contains all the infrastructure needed to setup system
- databases.
-EOF
-
-# postinst:
-cat > $PKGDIR/DEBIAN/postinst << EOF
-#!/bin/bash
-
-SQLVER=${SQLVER}
-
-case "\$1" in
-    configure)
-
-    if [ -f "/var/run/mysqld/mysqld.pid" ]; then
-        PID=\$(cat /var/run/mysqld/mysqld.pid)
-        kill \${PID}
-    fi
-
-    # LD_LIBRARY_PATH
-    # echo "/usr/lib/x86_64-linux-gnu" > /etc/ld.so.conf.d/mysql-\${SQLVER}.conf
-    ldconfig
-
-    if ! getent group mysql >/dev/null; then
-        addgroup --system mysql > /dev/null
-    fi
-
-    if ! getent passwd mysql >/dev/null; then
-        adduser \\
-            --system \\
-            --disabled-login \\
-            --ingroup mysql \\
-            --no-create-home \\
-            --home /nonexistent \\
-            --gecos "MySQL Server" \\
-            --shell /bin/false \\
-            mysql > /dev/null
-    fi
-
-    # MySQL 5.5+ Patch
-    mkdir -p /var/run/mysqld
-    chown -R mysql:mysql /var/run/mysqld > /dev/null
-    mkdir -p /var/log/mysqld
-    chown -R mysql:mysql /var/log/mysqld > /dev/null
-
-    rm -rf /var/lib/mysql/\$SQLVER
-    mkdir -p /var/lib/mysql
-
-    /usr/bin/mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql > /dev/null
-    /usr/bin/mysqld --user=mysql > /dev/null 2>&1 &
-
-    clear
-    echo -e ""
-    echo -e "    *******************************"
-    echo -e "    Settings MySQL Root Password "
-    echo -e "    *******************************"
-    echo -e ""
-    echo -e "    Enter MySQL Root Password"
-    echo -e ""
-    echo -e ""
-    read PASSWD
-    [[ "\$PASSWD" ]]
-
-    if [ "\$PASSWD" == "" ]; then
-        echo -e "    Settings MySQL Password:"
-        echo -e "    sudo /usr/bin/mysqladmin -u root password <MySQL PASSWD>"
-        echo -e ""
-    else
-        /usr/bin/mysqladmin -u root password \$PASSWD > /dev/null
-    fi
-
-    ;;
-esac
-EOF
-
-
-# prerm:
-cat > $PKGDIR/DEBIAN/prerm << EOF
-#!/bin/bash
-
-SQLVER=${SQLVER}
-
-case "\$1" in
-    remove|upgrade|deconfigure)
-
-    if [ -f "/var/run/mysqld/mysqld.pid" ]; then
-        PID=\$(cat /var/run/mysqld/mysqld.pid)
-        kill \${PID}
-    fi
-
-    ;;
-esac
-
-EOF
-
-
-# postrm:
-cat > $PKGDIR/DEBIAN/postrm << EOF
-#!/bin/bash
-
-
-SQLVER=${SQLVER}
-
-case "\$1" in
-    remove|upgrade|deconfigure)
-
-    # LD_LIBRARY_PATH
-    # rm -rf /etc/ld.so.conf.d/mysql.conf
-    ldconfig
-
-    if getent group mysql >/dev/null; then
-        groupdel -f mysql > /dev/null 2>&1
-    fi
-    if getent passwd mysql >/dev/null; then
-        userdel -r mysql > /dev/null 2>&1
-    fi
-    ;;
-esac
-EOF
-
-
-chmod 755 $PKGDIR/DEBIAN/postinst $PKGDIR/DEBIAN/postrm $PKGDIR/DEBIAN/prerm
-
-sudo chown -R 0:0 $PKGDIR
-sudo dpkg -b $PKGDIR $HOME/Build/${PKGNAME}-${SQLVER}_${PKGVER}-1_amd64.deb
-
-# 安裝套件
-sudo dpkg -i $HOME/Build/${PKGNAME}-${SQLVER}_${PKGVER}-1_amd64.deb
+sudo make install
 
